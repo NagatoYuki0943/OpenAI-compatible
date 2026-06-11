@@ -147,14 +147,7 @@ def create_app(
     async def models() -> dict[str, Any]:
         return {
             "object": "list",
-            "data": [
-                {
-                    "id": backend.model_id,
-                    "object": "model",
-                    "created": 0,
-                    "owned_by": "local",
-                }
-            ],
+            "data": [backend.model_card()],
         }
 
     @app.post(

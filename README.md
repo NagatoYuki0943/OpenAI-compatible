@@ -170,12 +170,56 @@ Subclass `BaseModelBackend` and implement `load_model()` and `infer()`. The
 default `stream_generate()` converts complete results to SSE chunks; override it
 when the model supports native token streaming.
 
-See `examples/custom_backend.py`, then configure:
+Custom backends can also declare metadata returned by `GET /v1/models`:
+
+```python
+from openai_compatible.backends import (
+    BaseModelBackend,
+    ModelMetadata,
+    ReasoningMetadata,
+)
+
+
+class MyModelBackend(BaseModelBackend):
+    model_metadata = ModelMetadata(
+        name="My Model",
+        capabilities=(
+            "reasoning",
+            "image-recognition",
+            "function-call",
+            # Add only after implementing an actual search integration:
+            # "web-search",
+        ),
+        input_modalities=("text", "image"),
+        output_modalities=("text",),
+        supports_streaming=True,
+        reasoning=ReasoningMetadata(
+            supported_efforts=("low", "medium", "high"),
+            default_effort="medium",
+            max_thinking_tokens=8192,
+        ),
+        context_window=32768,
+        max_output_tokens=4096,
+    )
+```
+
+Supported Cherry Studio-compatible capability values include
+`reasoning`, `image-recognition`, `audio-recognition`, `video-recognition`,
+`function-call`, `structured-output`, `file-input`, and `web-search`.
+These fields are OpenAI-compatible extensions, so other clients may ignore them.
+Declaring a capability does not implement it; the backend must still handle the
+corresponding image, tool, or search workflow.
+
+The package includes a runnable example backend at
+`openai_compatible.backends.custom:CustomModelBackend`. The source-tree alias
+is also available at `examples/custom_backend.py`.
+
+Configure the packaged example:
 
 PowerShell:
 
 ```powershell
-$env:MODEL_BACKEND_CLASS = "examples.custom_backend:CustomModelBackend"
+$env:MODEL_BACKEND_CLASS = "openai_compatible.backends.custom:CustomModelBackend"
 $env:MODEL_ID = "my-model"
 $env:MODEL_MAX_CONCURRENCY = "2"
 uv run openai-compatible-server
@@ -184,7 +228,7 @@ uv run openai-compatible-server
 Bash or Zsh:
 
 ```bash
-export MODEL_BACKEND_CLASS="examples.custom_backend:CustomModelBackend"
+export MODEL_BACKEND_CLASS="openai_compatible.backends.custom:CustomModelBackend"
 export MODEL_ID="my-model"
 export MODEL_MAX_CONCURRENCY="2"
 uv run openai-compatible-server
@@ -193,7 +237,7 @@ uv run openai-compatible-server
 Fish:
 
 ```fish
-set -x MODEL_BACKEND_CLASS "examples.custom_backend:CustomModelBackend"
+set -x MODEL_BACKEND_CLASS "openai_compatible.backends.custom:CustomModelBackend"
 set -x MODEL_ID "my-model"
 set -x MODEL_MAX_CONCURRENCY "2"
 uv run openai-compatible-server
@@ -202,10 +246,41 @@ uv run openai-compatible-server
 Windows Command Prompt:
 
 ```bat
-set MODEL_BACKEND_CLASS=examples.custom_backend:CustomModelBackend
+set MODEL_BACKEND_CLASS=openai_compatible.backends.custom:CustomModelBackend
 set MODEL_ID=my-model
 set MODEL_MAX_CONCURRENCY=2
 uv run openai-compatible-server
+```
+
+You can also load your own backend directly from a Python file without making
+it an installed package.
+
+PowerShell:
+
+```powershell
+$env:MODEL_BACKEND_CLASS = ".\my_backend.py:MyModelBackend"
+uv run openai-compatible-server
+```
+
+Bash or Zsh:
+
+```bash
+export MODEL_BACKEND_CLASS="./my_backend.py:MyModelBackend"
+uv run openai-compatible-server
+```
+
+Fish:
+
+```fish
+set -x MODEL_BACKEND_CLASS "./my_backend.py:MyModelBackend"
+uv run openai-compatible-server
+```
+
+For an installed third-party backend package, use its import path:
+
+```bash
+export MODEL_BACKEND_CLASS="my_model_package.backend:MyModelBackend"
+openai-compatible-server
 ```
 
 ## Environment
@@ -216,7 +291,7 @@ uv run openai-compatible-server
 | `PORT` | `8000` | Server port |
 | `API_KEY` | unset | Optional Bearer authentication |
 | `MODEL_ID` | `demo-multimodal-model` | Advertised model ID |
-| `MODEL_BACKEND_CLASS` | unset | Backend as `module:ClassName` |
+| `MODEL_BACKEND_CLASS` | unset | Backend as `module:ClassName` or `file.py:ClassName` |
 | `MODEL_MAX_CONCURRENCY` | `1` | Concurrent backend inference calls |
 | `MODEL_STREAM_CHUNK_SIZE` | `12` | Default stream adapter chunk size |
 | `LOG_DIR` | `logs` | Log directory |

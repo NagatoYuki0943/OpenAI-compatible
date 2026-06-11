@@ -17,7 +17,21 @@ def test_health_models_and_backend_lifecycle(settings, backend) -> None:
         assert health.status_code == 200
         assert health.json()["model_loaded"] is True
         assert health.headers["X-Request-ID"] == "health-id"
-        assert models.json()["data"][0]["id"] == "test-model"
+        model = models.json()["data"][0]
+        assert model["id"] == "test-model"
+        assert model["capabilities"] == [
+            "reasoning",
+            "image-recognition",
+            "function-call",
+        ]
+        assert model["input_modalities"] == ["text", "image"]
+        assert model["inputModalities"] == ["text", "image"]
+        assert model["supports_streaming"] is True
+        assert model["supportsStreaming"] is True
+        assert model["reasoning"]["supportedEfforts"] == ["low", "medium", "high"]
+        assert model["reasoning"]["defaultEffort"] == "medium"
+        assert model["context_window"] == 8192
+        assert model["contextWindow"] == 8192
         assert backend.load_count == 1
 
     assert backend.unload_count == 1

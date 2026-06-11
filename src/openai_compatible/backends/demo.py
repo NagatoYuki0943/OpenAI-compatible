@@ -6,10 +6,35 @@ from openai_compatible.backends.base import (
     BaseModelBackend,
     GenerationRequest,
     GenerationResult,
+    ModelMetadata,
+    ReasoningMetadata,
 )
 
 
 class DemoModelBackend(BaseModelBackend):
+    model_metadata = ModelMetadata(
+        name="Demo Multimodal Model",
+        description="Demonstration backend for the OpenAI-compatible server.",
+        capabilities=(
+            "reasoning",
+            "image-recognition",
+            "audio-recognition",
+            "video-recognition",
+            "file-input",
+        ),
+        input_modalities=("text", "image", "audio", "video"),
+        output_modalities=("text",),
+        supports_streaming=True,
+        reasoning=ReasoningMetadata(
+            type="effort",
+            supported_efforts=("none", "minimal", "low", "medium", "high"),
+            default_effort="medium",
+            min_thinking_tokens=0,
+        ),
+        context_window=128_000,
+        max_output_tokens=16_384,
+    )
+
     def load_model(self) -> dict[str, str]:
         return {"model_id": self.model_id, "type": "demo"}
 

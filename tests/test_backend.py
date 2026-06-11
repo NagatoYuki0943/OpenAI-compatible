@@ -13,6 +13,19 @@ async def test_backend_lifecycle_is_idempotent(backend) -> None:
     assert backend.unload_count == 1
 
 
+def test_model_card_contains_openai_and_capability_metadata(backend) -> None:
+    card = backend.model_card()
+
+    assert card["id"] == "test-model"
+    assert card["object"] == "model"
+    assert "reasoning" in card["capabilities"]
+    assert card["input_modalities"] == ["text", "image"]
+    assert card["inputModalities"] == ["text", "image"]
+    assert card["max_output_tokens"] == 1024
+    assert card["maxOutputTokens"] == 1024
+    assert card["reasoning"]["supportedEfforts"] == ["low", "medium", "high"]
+
+
 async def test_generate_and_default_stream_adapter(backend) -> None:
     await backend.load()
     request = GenerationRequest(

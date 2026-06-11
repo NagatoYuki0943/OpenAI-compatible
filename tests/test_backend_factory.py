@@ -1,0 +1,61 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from openai_compatible.backends.custom import CustomModelBackend
+from openai_compatible.backends.factory import create_model_backend
+from openai_compatible.config import Settings
+
+
+def _settings(tmp_path: Path, backend_class: str) -> Settings:
+    return Settings(
+        model_id="factory-test-model",
+        model_backend_class=backend_class,
+        log_dir=tmp_path / "logs",
+    )
+
+
+def test_factory_loads_installed_module_backend(tmp_path: Path) -> None:
+    backend = create_model_backend(
+        _settings(
+            tmp_path,
+            "openai_compatible.backends.custom:CustomModelBackend",
+        )
+    )
+
+    assert isinstance(backend, CustomModelBackend)
+    assert backend.model_id == "factory-test-model"
+
+
+def test_factory_loads_backend_from_python_file(tmp_path: Path) -> None:
+    backend_file = tmp_path / "my_backend.py"
+    backend_file.write_text(
+        "\n".join(
+            [
+                "from typing import Any",
+                "from openai_compatible.backends import (",
+                "    BaseModelBackend, GenerationRequest, GenerationResult",
+                ")",
+                "",
+                "class FileBackend(BaseModelBackend):",
+                "    def load_model(self) -> Any:",
+                "        return {'ready': True}",
+                "",
+                "    def infer(self, request: GenerationRequest):",
+                "        return [GenerationResult(content='file') for _ in range(request.n)]",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    backend = create_model_backend(_settings(tmp_path, f"{backend_file}:FileBackend"))
+
+    assert type(backend).__name__ == "FileBackend"
+    assert backend.model_id == "factory-test-model"
+
+
+def test_factory_error_explains_supported_backend_paths(tmp_path: Path) -> None:
+    with pytest.raises(ModuleNotFoundError, match=r"\.py file path"):
+        create_model_backend(_settings(tmp_path, "missing_package.backend:Backend"))

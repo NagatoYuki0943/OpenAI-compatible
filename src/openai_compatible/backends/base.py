@@ -5,9 +5,106 @@ import time
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from loguru import logger
+
+ModelCapability = Literal[
+    "function-call",
+    "reasoning",
+    "image-recognition",
+    "image-generation",
+    "audio-recognition",
+    "audio-generation",
+    "embedding",
+    "rerank",
+    "audio-transcript",
+    "video-recognition",
+    "video-generation",
+    "structured-output",
+    "file-input",
+    "web-search",
+    "code-execution",
+    "file-search",
+    "computer-use",
+]
+Modality = Literal["text", "image", "audio", "video", "vector"]
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh", "max", "auto"]
+
+
+@dataclass(frozen=True, slots=True)
+class ReasoningMetadata:
+    type: str = "effort"
+    supported_efforts: tuple[ReasoningEffort, ...] = ()
+    default_effort: ReasoningEffort | None = None
+    min_thinking_tokens: int | None = None
+    max_thinking_tokens: int | None = None
+    interleaved: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "type": self.type,
+            "supportedEfforts": list(self.supported_efforts),
+            "interleaved": self.interleaved,
+        }
+        if self.default_effort is not None:
+            result["defaultEffort"] = self.default_effort
+        if self.min_thinking_tokens is not None or self.max_thinking_tokens is not None:
+            limits: dict[str, int] = {}
+            if self.min_thinking_tokens is not None:
+                limits["min"] = self.min_thinking_tokens
+            if self.max_thinking_tokens is not None:
+                limits["max"] = self.max_thinking_tokens
+            result["thinkingTokenLimits"] = limits
+        return result
+
+
+@dataclass(frozen=True, slots=True)
+class ModelMetadata:
+    name: str | None = None
+    description: str | None = None
+    owned_by: str = "local"
+    created: int = 0
+    capabilities: tuple[ModelCapability, ...] = ()
+    input_modalities: tuple[Modality, ...] = ("text",)
+    output_modalities: tuple[Modality, ...] = ("text",)
+    supports_streaming: bool = True
+    reasoning: ReasoningMetadata | None = None
+    context_window: int | None = None
+    max_input_tokens: int | None = None
+    max_output_tokens: int | None = None
+    extra: dict[str, Any] = field(default_factory=dict)
+
+    def to_model_card(self, model_id: str) -> dict[str, Any]:
+        card: dict[str, Any] = {
+            "id": model_id,
+            "object": "model",
+            "created": self.created,
+            "owned_by": self.owned_by,
+            "name": self.name or model_id,
+            "capabilities": list(self.capabilities),
+            # Include both naming styles because OpenAI-compatible clients vary.
+            "input_modalities": list(self.input_modalities),
+            "inputModalities": list(self.input_modalities),
+            "output_modalities": list(self.output_modalities),
+            "outputModalities": list(self.output_modalities),
+            "supports_streaming": self.supports_streaming,
+            "supportsStreaming": self.supports_streaming,
+        }
+        if self.description is not None:
+            card["description"] = self.description
+        if self.reasoning is not None:
+            card["reasoning"] = self.reasoning.to_dict()
+        for snake_name, camel_name, value in (
+            ("context_window", "contextWindow", self.context_window),
+            ("max_input_tokens", "maxInputTokens", self.max_input_tokens),
+            ("max_output_tokens", "maxOutputTokens", self.max_output_tokens),
+        ):
+            if value is not None:
+                card[snake_name] = value
+                card[camel_name] = value
+        card.update(self.extra)
+        return card
 
 
 @dataclass(slots=True)
@@ -46,6 +143,8 @@ class GenerationChunk:
 
 
 class BaseModelBackend(ABC):
+    model_metadata: ModelMetadata | None = None
+
     def __init__(
         self,
         model_id: str,
@@ -63,6 +162,13 @@ class BaseModelBackend(ABC):
     @property
     def is_loaded(self) -> bool:
         return self._loaded
+
+    def get_model_metadata(self) -> ModelMetadata:
+        """Return metadata advertised by ``GET /v1/models``."""
+        return self.model_metadata or ModelMetadata()
+
+    def model_card(self) -> dict[str, Any]:
+        return self.get_model_metadata().to_model_card(self.model_id)
 
     async def load(self) -> None:
         async with self._lifecycle_lock:

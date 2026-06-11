@@ -8,11 +8,26 @@ from openai_compatible.backends import (
     BaseModelBackend,
     GenerationRequest,
     GenerationResult,
+    ModelMetadata,
+    ReasoningMetadata,
 )
 from openai_compatible.config import Settings
 
 
 class StubBackend(BaseModelBackend):
+    model_metadata = ModelMetadata(
+        name="Test Model",
+        capabilities=("reasoning", "image-recognition", "function-call"),
+        input_modalities=("text", "image"),
+        output_modalities=("text",),
+        reasoning=ReasoningMetadata(
+            supported_efforts=("low", "medium", "high"),
+            default_effort="medium",
+        ),
+        context_window=8192,
+        max_output_tokens=1024,
+    )
+
     def __init__(self, model_id: str = "test-model") -> None:
         super().__init__(model_id, max_concurrency=2, stream_chunk_size=5)
         self.load_count = 0
