@@ -1,0 +1,55 @@
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+
+from openai_compatible.backends import (
+    BaseModelBackend,
+    GenerationRequest,
+    GenerationResult,
+)
+from openai_compatible.config import Settings
+
+
+class StubBackend(BaseModelBackend):
+    def __init__(self, model_id: str = "test-model") -> None:
+        super().__init__(model_id, max_concurrency=2, stream_chunk_size=5)
+        self.load_count = 0
+        self.unload_count = 0
+        self.requests: list[GenerationRequest] = []
+
+    def load_model(self) -> dict[str, Any]:
+        self.load_count += 1
+        return {"ready": True}
+
+    def infer(self, request: GenerationRequest) -> list[GenerationResult]:
+        self.requests.append(request)
+        return [
+            GenerationResult(
+                content=f"answer-{index}",
+                reasoning_content=f"reason-{index}",
+                prompt_tokens=3,
+                completion_tokens=6,
+                reasoning_tokens=2,
+            )
+            for index in range(request.n)
+        ]
+
+    def unload_model(self) -> None:
+        self.unload_count += 1
+
+
+@pytest.fixture
+def backend() -> StubBackend:
+    return StubBackend()
+
+
+@pytest.fixture
+def settings(tmp_path) -> Settings:
+    return Settings(
+        api_key=None,
+        model_id="test-model",
+        log_dir=tmp_path / "logs",
+        log_level="DEBUG",
+    )

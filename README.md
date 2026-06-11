@@ -1,0 +1,59 @@
+# OpenAI-Compatible Server
+
+An extensible FastAPI Chat Completions server with multimodal messages, reasoning
+content, OpenAI tool fields, vLLM-style sampling parameters, SSE streaming, and
+pluggable model backends.
+
+## Setup
+
+```powershell
+uv sync
+uv run openai-compatible-server
+```
+
+The API is available at `http://127.0.0.1:8000`, with interactive docs at
+`http://127.0.0.1:8000/docs`.
+
+## Commands
+
+```powershell
+uv run openai-compatible-server
+uv run openai-compatible-http-client --stream
+uv run openai-compatible-sdk-client --stream
+uv run pytest
+uv run ruff check .
+```
+
+## Custom Model
+
+Subclass `BaseModelBackend` and implement `load_model()` and `infer()`. The
+default `stream_generate()` converts complete results to SSE chunks; override it
+when the model supports native token streaming.
+
+See `examples/custom_backend.py`, then configure:
+
+```powershell
+$env:MODEL_BACKEND_CLASS = "examples.custom_backend:CustomModelBackend"
+$env:MODEL_ID = "my-model"
+$env:MODEL_MAX_CONCURRENCY = "2"
+uv run openai-compatible-server
+```
+
+## Environment
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `HOST` | `0.0.0.0` | Server bind address |
+| `PORT` | `8000` | Server port |
+| `API_KEY` | unset | Optional Bearer authentication |
+| `MODEL_ID` | `demo-multimodal-model` | Advertised model ID |
+| `MODEL_BACKEND_CLASS` | unset | Backend as `module:ClassName` |
+| `MODEL_MAX_CONCURRENCY` | `1` | Concurrent backend inference calls |
+| `MODEL_STREAM_CHUNK_SIZE` | `12` | Default stream adapter chunk size |
+| `LOG_DIR` | `logs` | Log directory |
+| `LOG_LEVEL` | `INFO` | Log level |
+| `LOG_ROTATION` | `00:00` | Loguru rotation policy |
+| `LOG_RETENTION` | `14 days` | Log retention policy |
+
+Video input uses the compatibility extensions `video_url` and `input_video`.
+OpenAI Chat Completions does not define a standard video content part.
